@@ -6,16 +6,41 @@
 #import "WKInterfaceObject.h"
 #import "PCKWKInterfaceControllerProvider.h"
 #import "PCKWKInterfaceObjectProvider.h"
+#import <objc/runtime.h>
 
 
 @implementation PCKWKInterfaceObjectProvider
+
+static NSDictionary *pkWKClasses;
+
++ (void)initialize {
+    NSBundle *selfBundle = [NSBundle bundleForClass:self];
+    NSMutableDictionary *wkClasses = [NSMutableDictionary dictionary];
+    int numClasses;
+    Class * classes = NULL;
+    
+    classes = NULL;
+    numClasses = objc_getClassList(NULL, 0);
+    if (numClasses > 0 ) {
+        classes = (__unsafe_unretained Class *)malloc(sizeof(Class) * numClasses);
+        numClasses = objc_getClassList(classes, numClasses);
+        for (int i = 0; i < numClasses; i++) {
+            Class c = classes[i];
+            NSBundle *bundle = [NSBundle bundleForClass:c];
+            if ([bundle isEqual:selfBundle]) {
+                wkClasses[NSStringFromClass(c)] = c;
+            }
+        }
+        free(classes);
+    }
+}
 
 - (WKInterfaceObject *)interfaceObjectWithItemDictionary:(NSDictionary *)properties
                                      interfaceController:(WKInterfaceController *)interfaceController
 {
     NSString *propertyType = properties[@"type"];
     NSString *propertyClassName = [NSString stringWithFormat:@"WKInterface%@", [propertyType capitalizedString]];
-    Class propertyClass = NSClassFromString(propertyClassName);
+    Class propertyClass = pkWKClasses[propertyClassName] ?: NSClassFromString(propertyClassName);
     if (!propertyClass) {
         [NSException raise:NSInvalidArgumentException format:@"No property class found for '%@'.", propertyClassName];
         return nil;
